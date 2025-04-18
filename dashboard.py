@@ -1,4 +1,3 @@
-# dashboard.py
 import tkinter as tk
 from modules.ui_components import Sidebar, MainTab
 from modules.data_service import DataService
@@ -6,18 +5,14 @@ from modules.data_service import DataService
 class DashboardApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("F1 Information Dashboard")
-        self.geometry("1280x800")
-        # Initialize services
+        self.title('F1 Dashboard')
+        self.geometry('1280x800')
         ds = DataService()
-        # UI components
-        self.sidebar = Sidebar(self)
-        self.sidebar.pack(side='left', fill='y')
-        self.main_tab = MainTab(self)
-        self.main_tab.pack(side='right', fill='both', expand=True)
-        # Bind
-        self.sidebar.bind(ds, self.main_tab)
+        sb = Sidebar(self, width=200, bg='#161E2F')
+        sb.pack(side='left', fill='y')
+        mt = MainTab(self, bg='#242F48')
+        mt.pack(side='right', fill='both', expand=True)
+        sb.bind(ds, mt)
 
 if __name__ == '__main__':
-    app = DashboardApp()
-    app.mainloop()
+    DashboardApp().mainloop()
