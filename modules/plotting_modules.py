@@ -8,9 +8,7 @@ from matplotlib.collections import LineCollection
 import plotly.express as px
 from fastf1.ergast import Ergast
 
-# Suppress FutureWarning from FastF1 plotting
 warnings.filterwarnings('ignore', category=FutureWarning, module='fastf1.plotting')
-# Apply FastF1 dark theme for Matplotlib
 fastf1.plotting.setup_mpl(mpl_timedelta_support=True, misc_mpl_mods=False, color_scheme='fastf1')
 
 # Ergast API client

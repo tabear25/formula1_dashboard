@@ -14,27 +14,27 @@ class Sidebar(tk.Frame):
         self._build()
 
     def _build(self):
-        ttk.Label(self, text="Year:").pack(anchor='w', pady=5)
+        # 開催年を選択
+        ttk.Label(self, text="Year:").pack(anchor='w', pady=10)
         self.year_cb = ttk.Combobox(self, values=[1950,1951,1952,1953,1954,1955,1956,1957,1958,1959,1960,1961,1962,1963,1964,1965,1966,1967,1968,1969,1970,1971,1972,1973,1974,1975,1976,1977,1978,1979,1980,1981,1982,1983,1984,1985,1986,1987,1988,1989,1990,1991,1992,1993,1994,1995,1996,1997,1998,1999,2000,2001,2002,2003,2004,2005,2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025], state='readonly')
-        self.year_cb.current(3)
+        self.year_cb.current(75)  # 2025年をデフォルトイヤーとして設定
         self.year_cb.pack(fill='x')
-
-        ttk.Label(self, text="GP:").pack(anchor='w', pady=5)
+        # グランプリを選択
+        ttk.Label(self, text="Grand Prix").pack(anchor='w', pady=5)
         self.gp_cb = ttk.Combobox(self, values=[], state='readonly')
         self.gp_cb.pack(fill='x')
-
+        # セッションを選択
         ttk.Label(self, text="Session:").pack(anchor='w', pady=5)
-        self.ses_cb = ttk.Combobox(self, values=['FP1','FP2','FP3','Q','R'], state='readonly')
-        self.ses_cb.current(4)
+        self.ses_cb = ttk.Combobox(self, values=['FP1','FP2','FP3','Quali','Race'], state='readonly')
+        self.ses_cb.current(4) # Grand Prixをデフォルトセッションとして設定
         self.ses_cb.pack(fill='x')
-
+        # ドライバーを選択
         ttk.Label(self, text="Drivers:").pack(anchor='w', pady=5)
-        self.drivers_lb = tk.Listbox(self, selectmode='multiple', height=4)
+        self.drivers_lb = tk.Listbox(self, selectmode='multiple', height=20)
         self.drivers_lb.pack(fill='x')
-
+        # Loadボタン
         self.load_btn = ttk.Button(self, text="Load")
-        self.load_btn.pack(fill='x', pady=10)
-
+        self.load_btn.pack(fill='x', pady=5)
         self.progress = ttk.Progressbar(self, mode='indeterminate')
         self.progress.pack(fill='x')
 
