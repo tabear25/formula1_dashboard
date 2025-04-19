@@ -1,7 +1,0 @@
-{
-    "cache": {
-        "max_size_gb": 2,
-        "max_age_days": 30
-    },
-    "cache_dir": null
-}
