@@ -10,7 +10,6 @@ class MainTab(ttk.Notebook, TabInitializer, _DisplayMethods):
 
         # ─── タブ生成／初期化 ───
         self.init_overview()
-        self.init_telemetry()
         self.init_map()
         self.init_compare()
         self.init_speed()
@@ -21,4 +20,3 @@ class MainTab(ttk.Notebook, TabInitializer, _DisplayMethods):
         self._compare_canvas = None
         self._speed_canvas   = None
         self._scatter_canvas = None
-        self._telemetry_canvas = None
