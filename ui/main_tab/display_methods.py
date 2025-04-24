@@ -64,17 +64,77 @@ class _DisplayMethods:
 
     # 単独でのテレメトリデータを追加することのできるロジックを追加する
     """
-    def show_telemetry(self, session, drivers: list[str]):
-        fig = plt.Figure(figsize=(6, 4), dpi=100, facecolor=COLOR_FRAME)
-        ax = fig.add_subplot(111)
-        ax.text(0.5, 0.5, f"テレメトリ準備中: {', '.join(drivers)}",
-                ha="center", va="center", color=COLOR_TEXT)
-        
+    def show_telemetry(self, session, driver: list[str]):
+        if getattr(self, "_telemetry_canvas", None):
+            self._telemetry_canvas.get_tk_widget().destroy()
+        laps_df = session.laps.pick_quicklaps().reset_index()
+        df      = laps_df[laps_df['Driver'].isin(driver)].copy()
+        df['LapTime_s'] = df['LapTime'].dt.total_seconds()
+
+        fig = plt.Figure(figsize=(6,4), dpi=100,
+                         facecolor=COLOR_FRAME)
+        ax  = fig.add_subplot(111)
+        sns.violinplot(data=df, x='Driver', y='LapTime_s',
+                       inner='quartile', cut=0, ax=ax,
+                       palette=[COLOR_ACCENT]*len(drivers))
+        meds = df.groupby('Driver')['LapTime_s'].median()
+        ax.plot(range(len(drivers)), meds.values,
+                marker='o', linestyle='--',
+                color=COLOR_HIGHLIGHT)
+
+        ax.invert_yaxis()
+        ax.set_xlabel("Driver"); ax.set_ylabel("LapTime (s)")
+        ax.set_title(
+            f"LapTime Comparison – {session.event['EventName']} {session.event.year}",
+            color=COLOR_TEXT, fontsize=9
+        )
+        ax.grid(color="#333333")
+        ax.set_facecolor(COLOR_FRAME)
+        fig.patch.set_facecolor(COLOR_FRAME)
         fig.tight_layout()
-        canvas = FigureCanvasTkAgg(fig, master=self.telemetry_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(expand=True, fill="both")
-        self._telemetry_canvas = canvas
+
+        self._compare_canvas = FigureCanvasTkAgg(fig,
+                                                 master=self.compare_frame)
+        self._compare_canvas.draw()
+        self._compare_canvas.get_tk_widget().pack(
+            expand=True, fill="both")
+
+    def show_multi_driver_speed(self, session, drivers: list[str]):
+        if getattr(self, "_speed_canvas", None):
+            self._speed_canvas.get_tk_widget().destroy()
+        fastf1.plotting.setup_mpl(misc_mpl_mods=False,
+                                  color_scheme='fastf1')
+
+        fig = plt.Figure(figsize=(6,4), dpi=100,
+                         facecolor=COLOR_FRAME)
+        ax  = fig.add_subplot(111)
+        for drv in drivers:
+            lap = session.laps.pick_drivers(drv).pick_fastest()
+            tel = lap.get_car_data().add_distance()
+            style = fastf1.plotting.get_driver_style(
+                identifier=drv,
+                style=['color','linestyle'],
+                session=session
+            )
+            ax.plot(tel['Distance'], tel['Speed'],
+                    label=drv, **style)
+
+        ax.set_xlabel("Distance (m)")
+        ax.set_ylabel("Speed (km/h)")
+        ax.set_title(
+            f"Speed Comparison – {session.event['EventName']} {session.event.year}",
+            color=COLOR_TEXT, fontsize=9
+        )
+        ax.legend(); ax.grid(color="#333333")
+        ax.set_facecolor(COLOR_FRAME)
+        fig.patch.set_facecolor(COLOR_FRAME)
+        fig.tight_layout()
+
+        self._speed_canvas = FigureCanvasTkAgg(fig,
+                                               master=self.speed_frame)
+        self._speed_canvas.draw()
+        self._speed_canvas.get_tk_widget().pack(
+            expand=True, fill="both")
     """
 
     def show_multi_driver_compare(self, session, drivers: list[str]):
