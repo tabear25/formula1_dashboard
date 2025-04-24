@@ -63,7 +63,6 @@ class _DisplayMethods:
             expand=True, fill="both")
 
     # 単独でのテレメトリデータを追加することのできるロジックを追加する
-    """
     def show_telemetry(self, session, driver: list[str]):
         if getattr(self, "_telemetry_canvas", None):
             self._telemetry_canvas.get_tk_widget().destroy()
@@ -76,9 +75,9 @@ class _DisplayMethods:
         ax  = fig.add_subplot(111)
         sns.violinplot(data=df, x='Driver', y='LapTime_s',
                        inner='quartile', cut=0, ax=ax,
-                       palette=[COLOR_ACCENT]*len(drivers))
+                       palette=[COLOR_ACCENT]*len(driver))
         meds = df.groupby('Driver')['LapTime_s'].median()
-        ax.plot(range(len(drivers)), meds.values,
+        ax.plot(range(len(driver)), meds.values,
                 marker='o', linestyle='--',
                 color=COLOR_HIGHLIGHT)
 
@@ -135,7 +134,6 @@ class _DisplayMethods:
         self._speed_canvas.draw()
         self._speed_canvas.get_tk_widget().pack(
             expand=True, fill="both")
-    """
 
     def show_multi_driver_compare(self, session, drivers: list[str]):
         if getattr(self, "_compare_canvas", None):
