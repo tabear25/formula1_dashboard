@@ -67,3 +67,7 @@ class SidebarInitializer:
         # プログレスバー
         self.progress = ttk.Progressbar(self, mode="indeterminate")
         self.progress.pack(fill="x", padx=10, pady=10)
+        self.messagebox = messagebox.Message(
+            master=self, title="メッセージ", icon="info",
+            message="情報の読み込みが完了しました"
+        )

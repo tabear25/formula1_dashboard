@@ -2,6 +2,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 import fastf1
+import fastf1.plotting
 import seaborn as sns
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from config import COLOR_FRAME, COLOR_HIGHLIGHT, COLOR_TEXT, COLOR_ACCENT
@@ -60,6 +61,21 @@ class _DisplayMethods:
         self._map_canvas.draw()
         self._map_canvas.get_tk_widget().pack(
             expand=True, fill="both")
+
+    # 単独でのテレメトリデータを追加することのできるロジックを追加する
+    """
+    def show_telemetry(self, session, drivers: list[str]):
+        fig = plt.Figure(figsize=(6, 4), dpi=100, facecolor=COLOR_FRAME)
+        ax = fig.add_subplot(111)
+        ax.text(0.5, 0.5, f"テレメトリ準備中: {', '.join(drivers)}",
+                ha="center", va="center", color=COLOR_TEXT)
+        
+        fig.tight_layout()
+        canvas = FigureCanvasTkAgg(fig, master=self.telemetry_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(expand=True, fill="both")
+        self._telemetry_canvas = canvas
+    """
 
     def show_multi_driver_compare(self, session, drivers: list[str]):
         if getattr(self, "_compare_canvas", None):
@@ -164,4 +180,3 @@ class _DisplayMethods:
         self._scatter_canvas.draw()
         self._scatter_canvas.get_tk_widget().pack(
             expand=True, fill="both")
-

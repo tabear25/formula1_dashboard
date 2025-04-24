@@ -11,6 +11,13 @@ class TabInitializer:
         self.add(frame, text="🏁 Overview")
         self.overview_frame = frame
 
+    def init_telemetry(self):
+        frame = tk.Frame(self, bg=COLOR_FRAME)
+        tk.Label(frame, text="速度テレメトリ",
+                 fg=COLOR_TEXT, bg=COLOR_FRAME).pack()
+        self.add(frame, text=" Telemetry")
+        self.telemetry_frame = frame
+
     def init_map(self):
         frame = tk.Frame(self, bg=COLOR_FRAME)
         tk.Label(frame, text="🌐 サーキットマップ",
