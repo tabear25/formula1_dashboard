@@ -5,10 +5,16 @@
         "dlap",
         "drvs",
         "fastf",
+        "highlightthickness",
         "laptime",
+        "linestyle",
         "listvariable",
         "pady",
         "Quali",
-        "Qualy"
+        "Qualy",
+        "textvariable",
+        "troughcolor",
+        "wspace",
+        "yscrollcommand"
     ]
 }

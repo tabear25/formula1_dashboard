@@ -4,8 +4,8 @@ import tkinter as tk
 from tkinter import ttk
 from config import APP_TITLE, WINDOW_SIZE, COLOR_BG, COLOR_FRAME, COLOR_TEXT, COLOR_ACCENT
 from service import FastF1Service, CacheManager
-from ui.main_tab_caller import MainTab
-from ui.sidebar_caller import Sidebar
+from ui.main_tab import MainTab
+from ui.sidebar import Sidebar
 
 class F1DashboardApp(tk.Tk):
     def __init__(self):
