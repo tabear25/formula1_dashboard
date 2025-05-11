@@ -1,6 +1,7 @@
 import math
 import numpy as np
 import tkinter as tk
+from tkinter import messagebox
 import fastf1
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
@@ -13,14 +14,32 @@ def init_map(notebook):
     notebook.add(frame, text="🗺️ Map")
     return frame
 
+def _clear_frame_widgets(frame):
+    for widget in frame.winfo_children():
+        widget.destroy()
+
 def show_map(frame, session):
-    # 既存キャンバスがあれば破棄
-    if hasattr(frame, '_map_canvas'):
-        frame._map_canvas.get_tk_widget().destroy()
+    _clear_frame_widgets(frame) # Clear previous content, including error messages
 
     # 最速ラップと位置データ取得
     lap = session.laps.pick_fastest()
-    pos = lap.get_pos_data()
+    
+    if lap is None or not hasattr(lap, 'Driver'): # Check if lap is a valid Lap object
+        messagebox.showerror("データエラー", "最速ラップが見つかりません。マップを表示できません。")
+        tk.Label(frame, text="最速ラップデータなし", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
+        return
+
+    try:
+        pos = lap.get_pos_data()
+        if pos is None or pos.empty:
+            messagebox.showerror("データエラー", "最速ラップの位置データが見つかりません。マップを表示できません。")
+            tk.Label(frame, text="位置データなし", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
+            return
+    except Exception as e:
+        messagebox.showerror("データエラー", f"位置データ取得中にエラーが発生しました: {e}")
+        tk.Label(frame, text="位置データ取得エラー", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
+        return
+
     cinfo = session.get_circuit_info()
     coords = pos.loc[:, ("X", "Y")].to_numpy()
     theta = cinfo.rotation / 180 * math.pi
@@ -65,4 +84,3 @@ def show_map(frame, session):
     canvas = FigureCanvasTkAgg(fig, master=frame)
     canvas.draw()
     canvas.get_tk_widget().pack(expand=True, fill="both")
-    frame._map_canvas = canvas
