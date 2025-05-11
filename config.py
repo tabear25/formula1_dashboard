@@ -1,38 +1,30 @@
-import os
-from pathlib import Path
 from datetime import datetime
 
+# --- Application Wide ---
+APP_TITLE = "F1 Data Dashboard"
+WINDOW_SIZE = "1366x865" 
+
 """
-このモジュールはアプリケーションの設定を管理しています。
-YEAR_LIST=システムで取り扱う年度を定義します。
-F1が始まった1950年からリストするようにしています。
+2000年から現在までのF1データを取得するためのリスト。
+開始年度を変更したい場合は、YEAR_LISTの範囲を変更してください。
 """
+YEAR_LIST = list(range(2000, datetime.now().year + 1))
 
-# ─────────────────────────────────────────────────
-# アプリケーション設定
-# ─────────────────────────────────────────────────
-APP_TITLE   = "F1 Information Dashboard"
-WINDOW_SIZE = "1400x900"
 
-# ─────────────────────────────────────────────────
-# カラー定義
-# ─────────────────────────────────────────────────
-COLOR_BG        = "#161E2F"
-COLOR_FRAME     = "#242F48"
-COLOR_FRAME_2   = "#384358"
-COLOR_ACCENT    = "#B51A2B"
-COLOR_ACCENT_2  = "#591A2E"
-COLOR_HIGHLIGHT = "#FFA586"
-COLOR_TEXT      = "#FFFFFF"
+# --- Theming Colors ---
+COLOR_BG = "#2B2B2B"        # Main background color of the application window
+COLOR_FRAME = "#3C3F41"     # Background color for frames, sidebar, unselected notebook tabs
+COLOR_TEXT = "#BBBBBB"      # Default text color for labels, etc.
+COLOR_ACCENT = "#007ACC"    # Accent color for selected tabs, buttons, progress bar (e.g., a bright blue)
+COLOR_HIGHLIGHT = "#FF5722" # Highlight color for specific plot elements (e.g., fastest lap line on map, a distinct orange/red)
 
-# ─────────────────────────────────────────────────
-# キャッシュとデータ設定
-# ─────────────────────────────────────────────────
-CACHE_DIR           = Path(os.getenv("TEMP", ".")) / "fastf1_cache"
+# --- Matplotlib Style for FastF1 Plots ---
+MPL_STYLE = 'fastf1'
+
+# --- Cache Settings (used by service.py) ---
+CACHE_DIR = "_fastf1_cache"
 CACHE_SIZE_LIMIT_GB = 2
-CACHE_EXPIRE_DAYS   = 30
+CACHE_EXPIRE_DAYS = 30
 
-# ─────────────────────────────────────────────────
-# 年リスト（1950〜今年）
-# ─────────────────────────────────────────────────
-YEAR_LIST = list(range(1950, datetime.now().year + 1))
+# --- Logging ---
+LOG_LEVEL = "INFO"
