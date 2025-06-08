@@ -1,9 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from config import COLOR_FRAME, COLOR_TEXT, YEAR_LIST 
+# from tkinter import font as tkfont
+from config import COLOR_FRAME, COLOR_TEXT, YEAR_LIST
 from service import FastF1Service
-import threading 
-import datetime 
+import threading
+import datetime # For YEAR_LIST fallback
 
 class Sidebar(tk.Frame):
     def __init__(self, master, svc: FastF1Service, main_tab, **kw):
@@ -23,19 +24,18 @@ class Sidebar(tk.Frame):
         self.internal_frame.bind("<Configure>", self._on_frame_configure)
         
         self.canvas.bind("<MouseWheel>", self._on_mousewheel)
-        self.canvas.bind("<Button-4>", self._on_mousewheel)
-        self.canvas.bind("<Button-5>", self.canvas.yview_scroll, ("1", "units")) # Simplified Linux scroll
+        self.canvas.bind("<Button-4>", lambda e: self.canvas.yview_scroll(-1, "units"))
+        self.canvas.bind("<Button-5>", lambda e: self.canvas.yview_scroll(1, "units"))
 
         self.svc = svc
         self.main_tab = main_tab 
         self.current_session = None
 
-        # --- Populate the internal_frame with sidebar content ---
         tk.Label(self.internal_frame, text="開催年", bg=COLOR_FRAME, fg=COLOR_TEXT) \
           .pack(anchor="w", padx=10, pady=(10,0))
         year_frame = tk.Frame(self.internal_frame, bg=COLOR_FRAME)
         year_frame.pack(fill="x", padx=10)
-        self.year_var = tk.IntVar(value=YEAR_LIST[-1] if YEAR_LIST else datetime.date.today().year) # Handle empty YEAR_LIST
+        self.year_var = tk.IntVar(value=YEAR_LIST[-1] if YEAR_LIST else datetime.date.today().year)
         
         self.year_lb = tk.Listbox(year_frame, height=6, exportselection=False)
         for year_val in YEAR_LIST:
@@ -62,7 +62,7 @@ class Sidebar(tk.Frame):
         self.ses_cmb = ttk.Combobox(self.internal_frame,
                                     textvariable=self.ses_var,
                                     state="readonly",
-                                    values=["FP1","FP2","FP3","Q","R"])
+                                    values=["FP1","FP2","FP3","Q","R"]) # Added Sprint (S) if needed: "FP1","FP2","FP3","S","SQ","Q","R"
         self.ses_cmb.pack(fill="x", padx=10)
         self.ses_cmb.bind("<<ComboboxSelected>>", self._on_session_select)
 
@@ -99,12 +99,8 @@ class Sidebar(tk.Frame):
             self.canvas.itemconfig(self.canvas_window, width=self.canvas.winfo_width())
 
     def _on_mousewheel(self, event):
-        # Linux scroll events (Button-4 and Button-5) are handled by direct binding now.
-        # This handles Windows/macOS specific MouseWheel event.
-        if hasattr(event, 'delta') and event.delta: # Check if delta attribute exists and is non-zero
+        if hasattr(event, 'delta') and event.delta:
              self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
-        # For direct Button-4/5 binding, the command itself handles scroll, so no explicit check for event.num here needed
-        # unless this method is also bound to Button-4/5, which is slightly redundant with the new direct bind.
 
     def _start_loading_progress(self):
         self.progress.configure(mode='indeterminate')
@@ -138,10 +134,9 @@ class Sidebar(tk.Frame):
         fut = self.svc.get_event_schedule_async(year)
         def _done_callback(future):
             try:
-                schedule_df = future.result() # Pandas DataFrame expected
+                schedule_df = future.result()
                 self.gp_lb.delete(0, tk.END)
-                if not schedule_df.empty: # Check if DataFrame is not empty
-                    # Assuming 'EventName' is a column in the DataFrame
+                if not schedule_df.empty:
                     for gp_event_name in schedule_df['EventName']:
                         self.gp_lb.insert(tk.END, gp_event_name)
                 self._stop_loading_progress(success=True)
@@ -169,7 +164,11 @@ class Sidebar(tk.Frame):
         self._start_loading_progress()
         self.drv_lb.delete(0, tk.END) 
         self.current_session = None   
-        if self.main_tab: self.main_tab.show_overview() 
+        if self.main_tab: 
+            self.main_tab.show_overview() 
+            # Clear previous results before loading new ones
+            self.main_tab.show_session_results_data(None) 
+
 
         threading.Thread(
             target=self._load_session_thread,
@@ -178,36 +177,37 @@ class Sidebar(tk.Frame):
         ).start()
 
     def _load_session_thread(self, year, gp, ses):
-        # Assuming FastF1Service is correctly typed and svc is an instance of it
         fut = self.svc.load_session_async(year, gp, ses)
         def _done_callback(future):
             try:
-                session_obj = future.result() # Expecting a FastF1 Session object
+                session_obj = future.result() 
                 self.current_session = session_obj
                 
                 self.drv_lb.delete(0, tk.END)
-                # Ensure session_obj is not None and has 'drivers' attribute
                 if session_obj and hasattr(session_obj, 'drivers') and session_obj.drivers:
                     driver_abbreviations = []
-                    for drv_num in session_obj.drivers: # drivers is typically a list of driver numbers/IDs
+                    for drv_num in session_obj.drivers:
                         try:
-                            driver_info = session_obj.get_driver(drv_num) # Method to get driver details
+                            driver_info = session_obj.get_driver(drv_num)
                             if driver_info is not None and 'Abbreviation' in driver_info:
                                 driver_abbreviations.append(driver_info['Abbreviation'])
                         except Exception: 
-                            pass # Log error or handle missing driver info
+                            pass 
                     
                     driver_abbreviations.sort() 
                     for abbr in driver_abbreviations:
                         self.drv_lb.insert(tk.END, abbr)
 
                 self._stop_loading_progress(success=True)
-                if self.main_tab: self.main_tab.show_map(self.current_session) 
+                if self.main_tab: 
+                    self.main_tab.show_map(self.current_session) 
+                    self.main_tab.show_session_results_data(self.current_session) # Show results after loading
                 messagebox.showinfo("ロード完了", f"{year} {gp} – {ses} を読み込みました。\nドライバーを選択して分析を開始してください。")
 
             except Exception as e:
                 self._stop_loading_progress(success=False)
                 self.current_session = None 
+                if self.main_tab: self.main_tab.show_session_results_data(None) # Show error/empty state
                 messagebox.showerror("セッション取得エラー", f"エラー: {e}\nデータが存在しないか、ロードに失敗しました。")
         
         fut.add_done_callback(lambda f: self.after(0, _done_callback, f))
@@ -221,45 +221,34 @@ class Sidebar(tk.Frame):
             return False
         return True
 
+    # --- Command Methods (no changes here, ensure main_tab checks are in place) ---
     def _cmd_show_single_telemetry(self):
         if not self._ensure_session_loaded(): return
         drivers = self._get_selected_drivers()
-        if len(drivers) != 1:
-            messagebox.showinfo("ドライバー選択", "テレメトリ表示にはドライバーを1名選択してください。")
-            return
+        if len(drivers) != 1: messagebox.showinfo("ドライバー選択", "テレメトリ表示にはドライバーを1名選択してください。"); return
         if self.main_tab: self.main_tab.show_single_driver_telemetry(self.current_session, drivers)
 
     def _cmd_show_single_scatter(self):
         if not self._ensure_session_loaded(): return
         drivers = self._get_selected_drivers()
-        if len(drivers) != 1:
-            messagebox.showinfo("ドライバー選択", "ラップ散布図表示にはドライバーを1名選択してください。")
-            return
+        if len(drivers) != 1: messagebox.showinfo("ドライバー選択", "ラップ散布図表示にはドライバーを1名選択してください。"); return
         if self.main_tab: self.main_tab.show_single_driver_scatter(self.current_session, drivers)
 
     def _cmd_show_laptime_comparison(self):
         if not self._ensure_session_loaded(): return
         drivers = self._get_selected_drivers()
-        if len(drivers) < 1: 
-            messagebox.showinfo("ドライバー選択", "ラップタイム比較には少なくとも1名以上のドライバーを選択してください。")
-            return
+        if len(drivers) < 1: messagebox.showinfo("ドライバー選択", "ラップタイム比較には少なくとも1名以上のドライバーを選択してください。"); return
         if self.main_tab: self.main_tab.show_laptime_comparison(self.current_session, drivers)
 
     def _cmd_show_speed_comparison(self):
         if not self._ensure_session_loaded(): return
         drivers = self._get_selected_drivers()
-        if len(drivers) < 1:
-            messagebox.showinfo("ドライバー選択", "速度比較には少なくとも1名以上のドライバーを選択してください。")
-            return
+        if len(drivers) < 1: messagebox.showinfo("ドライバー選択", "速度比較には少なくとも1名以上のドライバーを選択してください。"); return
         if self.main_tab: self.main_tab.show_speed_comparison(self.current_session, drivers)
 
     def _cmd_show_scatter_comparison(self):
         if not self._ensure_session_loaded(): return
         drivers = self._get_selected_drivers()
-        if len(drivers) < 1:
-            messagebox.showinfo("ドライバー選択", "散布図比較には少なくとも1名以上のドライバーを選択してください (最大4名)。")
-            return
-        if len(drivers) > 4:
-            messagebox.showinfo("ドライバー選択超過", "散布図比較では最大4名まで選択可能です。最初の4名が表示されます。")
-            drivers = drivers[:4]
+        if len(drivers) < 1: messagebox.showinfo("ドライバー選択", "散布図比較には少なくとも1名以上のドライバーを選択してください (最大4名)。"); return
+        if len(drivers) > 4: messagebox.showinfo("ドライバー選択超過", "散布図比較では最大4名まで選択可能です。最初の4名が表示されます。"); drivers = drivers[:4]
         if self.main_tab: self.main_tab.show_scatter_comparison(self.current_session, drivers)

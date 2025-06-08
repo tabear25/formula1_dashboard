@@ -4,8 +4,9 @@ from tabs.overview import init_overview, show_overview
 from tabs.map_tab import init_map, show_map
 from tabs.compare_tab import init_compare, show_compare
 from tabs.speed_tab import init_speed, show_speed_compare
-from tabs.scatter_tab import init_scatter, show_scatter_compare, init_single_scatter, show_single_driver_scatter # Added single scatter imports
+from tabs.scatter_tab import init_scatter, show_scatter_compare, init_single_scatter, show_single_driver_scatter
 from tabs.telemetry_tab import init_telemetry, show_telemetry
+from tabs.results_tab import init_results_tab, show_session_results
 
 class MainTab(ttk.Notebook):
     def __init__(self, master, **kwargs):
@@ -21,6 +22,7 @@ class MainTab(ttk.Notebook):
         self.laptime_compare_frame   = init_compare(self)
         self.speed_compare_frame     = init_speed(self) 
         self.scatter_compare_frame   = init_scatter(self)
+        self.results_frame           = init_results_tab(self)
 
 
     # tabs/*で定義された関数を呼び出すためのメソッド
@@ -42,14 +44,18 @@ class MainTab(ttk.Notebook):
         return show_single_driver_scatter(self.single_scatter_frame, session, driver_list_one_elem[0])
 
     # Multi-Driver Comparison Views
-    def show_laptime_comparison(self, session, drivers): # Formerly show_multi_driver_compare
+    def show_laptime_comparison(self, session, drivers):
         self.select(self.laptime_compare_frame)
         return show_compare(self.laptime_compare_frame, session, drivers)
 
-    def show_speed_comparison(self, session, drivers): # Formerly show_multi_driver_speed
+    def show_speed_comparison(self, session, drivers):
         self.select(self.speed_compare_frame)
         return show_speed_compare(self.speed_compare_frame, session, drivers)
 
-    def show_scatter_comparison(self, session, drivers): # Formerly show_multi_lap_scatter
+    def show_scatter_comparison(self, session, drivers):
         self.select(self.scatter_compare_frame)
         return show_scatter_compare(self.scatter_compare_frame, session, drivers)
+    
+    def show_session_results_data(self, session): 
+        self.select(self.results_frame)
+        return show_session_results(self.results_frame, session)
