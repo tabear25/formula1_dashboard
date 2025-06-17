@@ -1,2 +1,5 @@
 task_tracker.md
 project.md
+__pycache__/
+_fastf1_cache/
+*.pyc
