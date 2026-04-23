@@ -50,7 +50,7 @@ class F1DashboardApp(tk.Tk):
         style.configure("TFrame", background=COLOR_FRAME)
         style.configure("TLabel", background=COLOR_FRAME, foreground=COLOR_TEXT)
         style.configure("TButton", background=COLOR_ACCENT, foreground=COLOR_TEXT) # Text color on button
-        style.map("TButton", background=[('active', COLOR_HIGHLIGHT if 'COLOR_HIGHLIGHT' in globals() else COLOR_ACCENT)])
+        style.map("TButton", background=[('active', COLOR_HIGHLIGHT)])
 
 
         style.configure("TNotebook", background=COLOR_BG, borderwidth=0)
@@ -63,7 +63,7 @@ class F1DashboardApp(tk.Tk):
         style.configure("MainNotebook.TNotebook", background=COLOR_FRAME, borderwidth=0)
         style.configure("MainNotebook.TNotebook.Tab", background=COLOR_FRAME, foreground=COLOR_TEXT, padding=[10,5], font=('TkDefaultFont', 10, 'bold'))
         style.map("MainNotebook.TNotebook.Tab",
-                  background=[("selected", COLOR_ACCENT), ("active", COLOR_HIGHLIGHT if 'COLOR_HIGHLIGHT' in globals() else COLOR_FRAME)],
+                  background=[("selected", COLOR_ACCENT), ("active", COLOR_HIGHLIGHT)],
                   foreground=[("selected", COLOR_BG if COLOR_BG != COLOR_TEXT else "white")])
 
 
@@ -87,7 +87,7 @@ class F1DashboardApp(tk.Tk):
                         foreground=COLOR_BG if COLOR_BG != COLOR_TEXT else "white", 
                         relief="flat", font=('TkDefaultFont', 10, 'bold'))
         style.map("Treeview.Heading",
-                  background=[('active', COLOR_HIGHLIGHT if 'COLOR_HIGHLIGHT' in globals() else COLOR_ACCENT)])
+                  background=[('active', COLOR_HIGHLIGHT)])
 
 
 def main():

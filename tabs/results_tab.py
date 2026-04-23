@@ -158,26 +158,33 @@ def show_session_results(frame, session: fastf1.core.Session): # Added type hint
         tree.heading(col_id, text=header_text)
         tree.column(col_id, width=col_width, anchor='w', minwidth=max(30, col_width // 2))
 
+    rows_data = []
     for _, row in results_df.iterrows():
         values_for_row = []
         for col_id in tree_columns_ids:
             val = row.get(col_id)
             _, _, data_type = columns_config[col_id]
-            
+
             if pd.isna(val):
                 values_for_row.append("")
             elif data_type == 'timedelta':
                 values_for_row.append(format_timedelta(val))
             elif data_type == 'int':
-                 # Try to convert to int, if it's float like 1.0, show as 1
-                try: values_for_row.append(str(int(float(str(val))))) 
-                except ValueError: values_for_row.append(str(val))
+                try:
+                    values_for_row.append(str(int(float(str(val)))))
+                except ValueError:
+                    values_for_row.append(str(val))
             elif data_type == 'float':
-                try: values_for_row.append(f"{float(str(val)):.1f}") # Format float to 1 decimal place
-                except ValueError: values_for_row.append(str(val))
-            else: # str
+                try:
+                    values_for_row.append(f"{float(str(val)):.1f}")
+                except ValueError:
+                    values_for_row.append(str(val))
+            else:
                 values_for_row.append(str(val))
-        tree.insert("", "end", values=tuple(values_for_row))
+        rows_data.append(tuple(values_for_row))
+
+    from ui.animations import animate_treeview_rows
+    animate_treeview_rows(tree, rows_data, delay=40)
 
     vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tree.yview)
     hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tree.xview)
