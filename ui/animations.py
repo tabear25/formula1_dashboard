@@ -115,13 +115,16 @@ class CloudLoader(tk.Canvas):
         self._tick = (self._tick + 1) % self._CYCLE
         t = self._tick / self._CYCLE
         cy_base = self._ch // 2
-        for i, (dot, x, _) in enumerate(self._dots):
-            phase = (t + i / self._DOT_COUNT) % 1.0
-            bounce = int(self._BOUNCE * (math.sin(phase * 2 * math.pi) * 0.5 + 0.5))
-            r = self._DOT_R
-            cy = cy_base - bounce
-            self.coords(dot, x - r, cy - r, x + r, cy + r)
-        self._job = self.after(self._FRAME_MS, self._animate)
+        try:
+            for i, (dot, x, _) in enumerate(self._dots):
+                phase = (t + i / self._DOT_COUNT) % 1.0
+                bounce = int(self._BOUNCE * (math.sin(phase * 2 * math.pi) * 0.5 + 0.5))
+                r = self._DOT_R
+                cy = cy_base - bounce
+                self.coords(dot, x - r, cy - r, x + r, cy + r)
+            self._job = self.after(self._FRAME_MS, self._animate)
+        except tk.TclError:
+            self._running = False
 
 
 def show_chart_with_loader(frame, loading_text, bg_color, dot_color, render_fn):
@@ -145,7 +148,7 @@ def show_chart_with_loader(frame, loading_text, bg_color, dot_color, render_fn):
         try:
             loader_wrap.destroy()
         except tk.TclError:
-            pass
+            return  # loader_wrap already destroyed by a newer show_xxx call; skip stale render
         render_fn()
 
     frame.after(80, _do_render)

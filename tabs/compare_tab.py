@@ -3,8 +3,6 @@ from tkinter import messagebox
 import pandas as pd
 import seaborn as sns
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-import fastf1
-import fastf1.plotting
 import matplotlib.pyplot as plt
 from config import COLOR_FRAME, COLOR_ACCENT, COLOR_HIGHLIGHT, COLOR_TEXT
 from ui.animations import show_chart_with_loader
