@@ -5,7 +5,9 @@ from tkinter import messagebox
 import fastf1
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
-from config import COLOR_FRAME, COLOR_HIGHLIGHT, COLOR_TEXT
+from config import COLOR_FRAME, COLOR_ACCENT, COLOR_HIGHLIGHT, COLOR_TEXT
+from ui.animations import show_chart_with_loader
+
 
 def init_map(notebook):
     frame = tk.Frame(notebook, bg=COLOR_FRAME)
@@ -14,73 +16,71 @@ def init_map(notebook):
     notebook.add(frame, text="🗺️ Map")
     return frame
 
+
 def _clear_frame_widgets(frame):
     for widget in frame.winfo_children():
         widget.destroy()
 
+
 def show_map(frame, session):
-    _clear_frame_widgets(frame) # Clear previous content, including error messages
+    _clear_frame_widgets(frame)
 
-    # 最速ラップと位置データ取得
-    lap = session.laps.pick_fastest()
-    
-    if lap is None or not hasattr(lap, 'Driver'): # Check if lap is a valid Lap object
-        messagebox.showerror("データエラー", "最速ラップが見つかりません。マップを表示できません。")
-        tk.Label(frame, text="最速ラップデータなし", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
-        return
+    def _render():
+        lap = session.laps.pick_fastest()
 
-    try:
-        pos = lap.get_pos_data()
-        if pos is None or pos.empty:
-            messagebox.showerror("データエラー", "最速ラップの位置データが見つかりません。マップを表示できません。")
-            tk.Label(frame, text="位置データなし", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
+        if lap is None or not hasattr(lap, 'Driver'):
+            messagebox.showerror("データエラー", "最速ラップが見つかりません。マップを表示できません。")
+            tk.Label(frame, text="最速ラップデータなし", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
             return
-    except Exception as e:
-        messagebox.showerror("データエラー", f"位置データ取得中にエラーが発生しました: {e}")
-        tk.Label(frame, text="位置データ取得エラー", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
-        return
 
-    cinfo = session.get_circuit_info()
-    coords = pos.loc[:, ("X", "Y")].to_numpy()
-    theta = cinfo.rotation / 180 * math.pi
+        try:
+            pos = lap.get_pos_data()
+            if pos is None or pos.empty:
+                messagebox.showerror("データエラー", "最速ラップの位置データが見つかりません。マップを表示できません。")
+                tk.Label(frame, text="位置データなし", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
+                return
+        except Exception as e:
+            messagebox.showerror("データエラー", f"位置データ取得中にエラーが発生しました: {e}")
+            tk.Label(frame, text="位置データ取得エラー", fg=COLOR_TEXT, bg=COLOR_FRAME).pack(expand=True)
+            return
 
-    # 回転行列適用
-    R = np.array([[math.cos(theta), -math.sin(theta)],
-                  [math.sin(theta),  math.cos(theta)]])
-    track = coords @ R
+        cinfo = session.get_circuit_info()
+        coords = pos.loc[:, ("X", "Y")].to_numpy()
+        theta = cinfo.rotation / 180 * math.pi
 
-    # 描画
-    fig = plt.Figure(figsize=(6,4), dpi=100, facecolor=COLOR_FRAME)
-    ax = fig.add_subplot(111)
-    ax.plot(track[:,0], track[:,1],
-            color=COLOR_HIGHLIGHT, linewidth=2)
+        R = np.array([[math.cos(theta), -math.sin(theta)],
+                      [math.sin(theta),  math.cos(theta)]])
+        track = coords @ R
 
-    # コーナー番号注記
-    offset0 = np.array([500, 0])
-    def _rot(pt, ang):
-        return pt @ np.array([[math.cos(ang), -math.sin(ang)],
-                              [math.sin(ang),  math.cos(ang)]])
+        fig = plt.Figure(figsize=(6, 4), dpi=100, facecolor=COLOR_FRAME)
+        ax = fig.add_subplot(111)
+        ax.plot(track[:, 0], track[:, 1], color=COLOR_HIGHLIGHT, linewidth=2)
 
-    for _, corner in cinfo.corners.iterrows():
-        txt    = f"{corner['Number']}{corner['Letter']}"
-        ang_off= corner['Angle']/180*math.pi
-        off    = _rot(offset0, ang_off)
-        p_orig = np.array([corner['X'], corner['Y']])
-        text_pt= _rot(p_orig + off, theta)
-        track_pt=_rot(p_orig, theta)
-        ax.scatter(text_pt[0], text_pt[1], color='grey', s=100)
-        ax.plot([track_pt[0], text_pt[0]],
-                [track_pt[1], text_pt[1]],
-                color='grey')
-        ax.text(text_pt[0], text_pt[1], txt,
-                va='center_baseline', ha='center',
-                color='white', fontsize=6)
+        offset0 = np.array([500, 0])
 
-    ax.set_title(f"{session.event['Location']} {session.event.year}",
-                 color=COLOR_TEXT)
-    ax.axis("equal"); ax.axis("off")
-    fig.tight_layout()
+        def _rot(pt, ang):
+            return pt @ np.array([[math.cos(ang), -math.sin(ang)],
+                                   [math.sin(ang),  math.cos(ang)]])
 
-    canvas = FigureCanvasTkAgg(fig, master=frame)
-    canvas.draw()
-    canvas.get_tk_widget().pack(expand=True, fill="both")
+        for _, corner in cinfo.corners.iterrows():
+            txt     = f"{corner['Number']}{corner['Letter']}"
+            ang_off = corner['Angle'] / 180 * math.pi
+            off     = _rot(offset0, ang_off)
+            p_orig  = np.array([corner['X'], corner['Y']])
+            text_pt = _rot(p_orig + off, theta)
+            track_pt = _rot(p_orig, theta)
+            ax.scatter(text_pt[0], text_pt[1], color='grey', s=100)
+            ax.plot([track_pt[0], text_pt[0]], [track_pt[1], text_pt[1]], color='grey')
+            ax.text(text_pt[0], text_pt[1], txt,
+                    va='center_baseline', ha='center', color='white', fontsize=6)
+
+        ax.set_title(f"{session.event['Location']} {session.event.year}", color=COLOR_TEXT)
+        ax.axis("equal")
+        ax.axis("off")
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(expand=True, fill="both")
+
+    show_chart_with_loader(frame, "サーキットマップを読み込み中...", COLOR_FRAME, COLOR_ACCENT, _render)
