@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "file=$(jq -r '.tool_input.file_path // empty' 2>/dev/null); [ -z \"$file\" ] && exit 0; echo \"$file\" | grep -qE '(^|/)CLAUDE\\.md$' && exit 0; d=$(date '+%Y-%m-%d %H:%M'); sed -i \"s|^_Last updated:.*|_Last updated: $d|\" CLAUDE.md 2>/dev/null || true",
+            "statusMessage": "Updating CLAUDE.md timestamp..."
+          }
+        ]
+      }
+    ]
+  }
+}
