@@ -51,30 +51,22 @@ def show_session_results(frame, session: fastf1.core.Session): # Added type hint
         ttk.Label(frame, text="セッションデータがありません。", style="TLabel", anchor="center").pack(expand=True, fill="both")
         return
 
+    # session.load() (service.py) ですでに結果データはロード済み。存在確認のみ行う。
     try:
-        # Explicitly load results data for the session
-        # This is now the primary way to get results data.
-        if not hasattr(session, 'results') or session.results is None or session.results.empty:
-            if hasattr(session, 'load_results') and callable(session.load_results):
-                # Some session types (e.g., Test Day) might not have 'results' in a typical sense.
-                # FastF1 might raise an error or return None/empty for such cases.
-                session.load_results() # Attempt to load results
-            else: # Should not happen with standard FastF1 Session objects
-                raise AttributeError("Session object does not have a 'load_results' method.")
+        has_results = (
+            hasattr(session, 'results')
+            and session.results is not None
+            and not session.results.empty
+        )
+    except Exception as e:
+        ttk.Label(frame, text=f"結果データの確認中にエラー: {type(e).__name__}: {e}",
+                  style="TLabel", wraplength=max(200, frame.winfo_width() - 40),
+                  anchor="center").pack(expand=True, fill="both")
+        return
 
-        if session.results is None or session.results.empty:
-            ttk.Label(frame, text="このセッションの結果データはありません。\n(または、このセッションタイプには結果がありません)", style="TLabel", anchor="center").pack(expand=True, fill="both")
-            return
-
-    except AttributeError as ae: # Handle case where load_results might not exist for some custom/mock object
-         ttk.Label(frame, text=f"セッションオブジェクトエラー: {ae}", style="TLabel", wraplength=frame.winfo_width()-40, anchor="center").pack(expand=True, fill="both")
-         return
-    except fastf1.api.SessionNotAvailableError as snae: # Specific error for unavailable data
-         ttk.Label(frame, text=f"結果データ利用不可: {snae}", style="TLabel", wraplength=frame.winfo_width()-40, anchor="center").pack(expand=True, fill="both")
-         return
-    except Exception as e: # Catch other potential errors during load_results
-        # messagebox.showerror("結果データエラー", f"結果データのロード中にエラーが発生しました: {e}")
-        ttk.Label(frame, text=f"結果データのロードエラー: {type(e).__name__}: {e}", style="TLabel", wraplength=frame.winfo_width()-40, anchor="center").pack(expand=True, fill="both")
+    if not has_results:
+        ttk.Label(frame, text="このセッションの結果データはありません。\n(または、このセッションタイプには結果がありません)",
+                  style="TLabel", anchor="center").pack(expand=True, fill="both")
         return
 
     results_df = session.results.copy()
@@ -122,16 +114,24 @@ def show_session_results(frame, session: fastf1.core.Session): # Added type hint
             results_df.rename(columns={'FastestLapTime': 'Time'}, inplace=True) # Standardize for display
         columns_config.pop('FastestLapTime', None) # remove original if renamed
 
-    # Add FullName using get_driver, place it after Abbreviation
-    if 'DriverNumber' in results_df.columns:
+    # FullName を Abbreviation の直後に表示する。
+    # session.results は通常 FullName 列を持つ。無い場合のみ get_driver で補完する。
+    if 'FullName' not in results_df.columns and 'DriverNumber' in results_df.columns:
         full_names = []
         for driver_number in results_df['DriverNumber']:
             try:
                 driver_info = session.get_driver(driver_number)
-                full_names.append(driver_info['FullName'] if driver_info and 'FullName' in driver_info else "")
-            except:
-                full_names.append("") # Fallback
+                # driver_info は pandas Series。bool() 評価は ValueError になるため
+                # 明示的に None 判定し、'in' でキーの有無を確認する。
+                if driver_info is not None and 'FullName' in driver_info:
+                    full_names.append(driver_info['FullName'])
+                else:
+                    full_names.append("")
+            except Exception:
+                full_names.append("")  # Fallback
         results_df['FullName'] = full_names
+
+    if 'FullName' in results_df.columns:
         # Insert FullName into columns_config in the desired order
         temp_cols = list(columns_config.items())
         try:

@@ -35,7 +35,7 @@ def show_speed_compare(frame, session, drivers):
 
         at_least_one_plotted = False
         for drv in drivers:
-            lap = session.laps.pick_driver(drv).pick_fastest()
+            lap = session.laps.pick_drivers(drv).pick_fastest()
             if lap is None or not hasattr(lap, 'Driver'):
                 print(f"ドライバー {drv} の最速ラップが見つかりません。スキップします。")
                 continue

@@ -57,3 +57,12 @@ This gives visible loading feedback before the matplotlib render begins.
 - `main.py`: Removed three redundant `'COLOR_HIGHLIGHT' in globals()` guards — `COLOR_HIGHLIGHT` is always imported.
 - `scatter_tab.py`: Replaced `plt.subplots()` with `fig.subplots()` to avoid pyplot global state.
 - All chart tabs: Title labels and error labels moved inside `_render()` so the frame is clean before the loader appears.
+
+### Data-display correctness (FastF1 3.5 / seaborn 0.13)
+
+- `scatter_tab.py`: `get_compound_mapping()` no longer receives the unsupported `weekend` keyword. Both scatter tabs previously raised `TypeError` and rendered nothing.
+- `scatter_tab.py`: Scatter Compare draws a single figure-level compound legend covering every plotted driver, instead of a partial legend on the first panel only.
+- `compare_tab.py`: The violin plot assigns `hue='Driver'` with a dict palette — fixes the seaborn "palette without hue" deprecation and a colour-count mismatch when a selected driver has no quick laps.
+- `results_tab.py`: The Full Name column is taken from `session.results` directly. The old `get_driver()` rebuild evaluated a pandas Series in boolean context (`ValueError`, swallowed by a bare `except`), so every Full Name rendered blank.
+- `results_tab.py`: Removed the call to the non-existent `Session.load_results()` and the `fastf1.api` dependency — `session.load()` already loads results.
+- `speed_tab.py`, `scatter_tab.py`, `telemetry_tab.py`: `pick_driver()` → `pick_drivers()` (the singular form is deprecated since FastF1 3.1).

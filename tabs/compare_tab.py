@@ -51,12 +51,12 @@ def show_compare(frame, session, drivers):
         fig = plt.Figure(figsize=(6, 4), dpi=100, facecolor=COLOR_FRAME)
         ax = fig.add_subplot(111)
 
-        num_drivers = len(df['Driver'].unique())
-        palette = [COLOR_ACCENT] * num_drivers
+        palette = {drv: COLOR_ACCENT for drv in drivers}
 
-        sns.violinplot(data=df, x='Driver', y='LapTime_s',
+        sns.violinplot(data=df, x='Driver', y='LapTime_s', hue='Driver',
                        inner='quartile', cut=0, ax=ax,
-                       order=drivers, palette=palette)
+                       order=drivers, hue_order=drivers,
+                       palette=palette, legend=False)
 
         medians_series = df.groupby('Driver')['LapTime_s'].median()
         valid_drivers = [d for d in drivers if d in medians_series and pd.notna(medians_series.get(d))]

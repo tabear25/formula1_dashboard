@@ -32,7 +32,7 @@ def show_telemetry(frame, session, driver_list_one_elem):
                  text=f"📈 {driver_abbreviation} 速度テレメトリ (最速ラップ)",
                  fg=COLOR_TEXT, bg=COLOR_FRAME).pack()
 
-        lap = session.laps.pick_driver(driver_abbreviation).pick_fastest()
+        lap = session.laps.pick_drivers(driver_abbreviation).pick_fastest()
 
         if lap is None or not hasattr(lap, 'Driver'):
             messagebox.showerror("データエラー",

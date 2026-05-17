@@ -4,6 +4,7 @@ import seaborn as sns
 import pandas as pd
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from config import COLOR_FRAME, COLOR_ACCENT, COLOR_TEXT
 import fastf1
 import fastf1.plotting
@@ -65,7 +66,7 @@ def show_scatter_compare(frame, session, drivers):
         axes = fig.subplots(2, 2)
         fig.subplots_adjust(hspace=0.4, wspace=0.3)
 
-        compound_mapping = fastf1.plotting.get_compound_mapping(session=session, weekend=False)
+        compound_mapping = fastf1.plotting.get_compound_mapping(session)
 
         for i, drv in enumerate(plot_drivers):
             ax = axes.flatten()[i]
@@ -77,14 +78,7 @@ def show_scatter_compare(frame, session, drivers):
             else:
                 sns.scatterplot(data=df_drv, x="LapNumber", y=y_col,
                                 hue="Compound", palette=compound_mapping,
-                                s=40, linewidth=0, ax=ax, legend=(i == 0))
-
-                if i == 0 and ax.get_legend() is not None:
-                    leg = ax.get_legend()
-                    plt.setp(leg.get_texts(), color=COLOR_TEXT)
-                    leg.get_title().set_color(COLOR_TEXT)
-                    leg.get_frame().set_facecolor(COLOR_FRAME)
-                    leg.get_frame().set_edgecolor(COLOR_TEXT)
+                                s=40, linewidth=0, ax=ax, legend=False)
 
                 ax.invert_yaxis()
                 ax.set_xlabel("Lap #", color=COLOR_TEXT)
@@ -99,8 +93,28 @@ def show_scatter_compare(frame, session, drivers):
         for j in range(len(plot_drivers), 4):
             axes.flatten()[j].axis('off')
 
+        # 各サブプロットに凡例を出すとドライバーごとに使用コンパウンドが
+        # 異なり不完全になるため、全パネル共通の凡例を figure 単位で1つ表示する。
+        compound_order = ['SOFT', 'MEDIUM', 'HARD', 'INTERMEDIATE', 'WET']
+        compounds_present = sorted(
+            (c for c in laps_to_plot['Compound'].dropna().unique()),
+            key=lambda c: compound_order.index(c) if c in compound_order else len(compound_order),
+        )
+        if compounds_present:
+            handles = [
+                Line2D([0], [0], marker='o', linestyle='', markersize=7,
+                       markerfacecolor=compound_mapping.get(c, COLOR_TEXT),
+                       markeredgecolor='none', label=c)
+                for c in compounds_present
+            ]
+            leg = fig.legend(handles=handles, title="Compound",
+                             loc='upper center', ncol=len(handles), fontsize=8,
+                             facecolor=COLOR_FRAME, edgecolor=COLOR_TEXT)
+            plt.setp(leg.get_texts(), color=COLOR_TEXT)
+            leg.get_title().set_color(COLOR_TEXT)
+
         fig.patch.set_facecolor(COLOR_FRAME)
-        fig.tight_layout(rect=[0, 0, 1, 0.96])
+        fig.tight_layout(rect=[0, 0, 1, 0.92])
 
         canvas = FigureCanvasTkAgg(fig, master=frame)
         canvas.draw()
@@ -116,7 +130,7 @@ def show_single_driver_scatter(frame, session, driver_abbreviation):
         tk.Label(frame, text=f"📊 ラップタイム散布図 ({driver_abbreviation})",
                  fg=COLOR_TEXT, bg=COLOR_FRAME).pack()
 
-        laps_df = session.laps.pick_driver(driver_abbreviation).pick_quicklaps().reset_index()
+        laps_df = session.laps.pick_drivers(driver_abbreviation).pick_quicklaps().reset_index()
 
         if laps_df.empty:
             messagebox.showinfo("データなし",
@@ -135,7 +149,7 @@ def show_single_driver_scatter(frame, session, driver_abbreviation):
         fig = plt.Figure(figsize=(7, 5), dpi=100, facecolor=COLOR_FRAME)
         ax = fig.add_subplot(111)
 
-        compound_mapping = fastf1.plotting.get_compound_mapping(session=session, weekend=False)
+        compound_mapping = fastf1.plotting.get_compound_mapping(session)
 
         sns.scatterplot(data=laps_to_plot, x="LapNumber", y=y_col,
                         hue="Compound", palette=compound_mapping,
