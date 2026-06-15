@@ -18,7 +18,7 @@ class F1DashboardApp(tk.Tk):
 
         if MPL_STYLE:
             try:
-                fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme=MPL_STYLE, misc_mpl_mods=False)
+                fastf1.plotting.setup_mpl(mpl_timedelta_support=True, color_scheme=MPL_STYLE)
                 logging.info(f"Applied Matplotlib style: {MPL_STYLE}")
             except Exception as e:
                 logging.warning(f"Could not apply Matplotlib style '{MPL_STYLE}': {e}")

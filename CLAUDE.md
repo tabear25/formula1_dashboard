@@ -37,5 +37,9 @@ python main.py
 
 ここに修正・変更の内容を追記していく。新しいものを上に追加すること。
 
+- `main.py`: `fastf1.plotting.setup_mpl()` から廃止済みの `misc_mpl_mods=False`
+  引数を削除（fastf1 3.6.0 で削除され、3.8 系では `FutureWarning` を出すため）。
+  これにより起動時の警告が解消。Xvfb 上でのヘッドレス起動テストで GUI が
+  正常に構築され、終了コード 0 で終了することを確認済み。
 - （初回）CLAUDE.md を作成。「新しい修正や変更はすべて CLAUDE.md に反映する」
   ルールを明記。
