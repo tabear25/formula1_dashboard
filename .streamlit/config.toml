@@ -1,0 +1,10 @@
+# Streamlit 設定。配色は config.py のダークテーマ（COLOR_*）に合わせる。
+[server]
+headless = true
+
+[theme]
+base = "dark"
+primaryColor = "#007ACC"          # COLOR_ACCENT
+backgroundColor = "#2B2B2B"       # COLOR_BG
+secondaryBackgroundColor = "#3C3F41"  # COLOR_FRAME
+textColor = "#BBBBBB"             # COLOR_TEXT
