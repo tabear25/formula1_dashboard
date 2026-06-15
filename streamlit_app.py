@@ -43,7 +43,11 @@ def _setup_mpl():
 
 
 def _show_fig(builder, *args):
-    """Figure ビルダーを実行し、結果を描画する。データ無しは警告表示。"""
+    """Figure ビルダーを実行し、結果を描画する。データ無しは警告表示。
+
+    `use_container_width=True` で図を列幅に追従させ、画面幅（PC/タブレット/スマホ）に
+    応じて自動でスケールさせる（レスポンシブ）。
+    """
     try:
         fig = builder(*args)
     except ChartDataError as e:
@@ -52,11 +56,57 @@ def _show_fig(builder, *args):
     except Exception as e:  # noqa: BLE001 - 予期せぬ描画エラーも UI に出す
         st.error(f"描画中にエラーが発生しました: {e}")
         return
-    st.pyplot(fig)
+    st.pyplot(fig, use_container_width=True)
+
+
+def _inject_responsive_css():
+    """画面幅に応じてレイアウトを最適化するレスポンシブ CSS を注入する。
+
+    Streamlit は既定でも幅に追従するが、スマホ／タブレットでの可読性を上げるため
+    余白・見出しサイズ・タブの折り返し等を CSS のメディアクエリで調整する。
+    """
+    st.markdown(
+        """
+        <style>
+        /* 見出しはビューポート幅に応じて滑らかにスケール（clamp でレスポンシブ） */
+        h1 { font-size: clamp(1.4rem, 4vw, 2.2rem) !important; }
+        h2 { font-size: clamp(1.15rem, 3vw, 1.6rem) !important; }
+        h3 { font-size: clamp(1.0rem, 2.6vw, 1.3rem) !important; }
+
+        /* タブが多くてもスマホで折り返さず横スクロールで全件アクセスできるように */
+        .stTabs [data-baseweb="tab-list"] {
+            overflow-x: auto;
+            flex-wrap: nowrap;
+            scrollbar-width: thin;
+        }
+        .stTabs [data-baseweb="tab"] { white-space: nowrap; }
+
+        /* タブレット以下: 本文余白を詰めて描画領域を最大化 */
+        @media (max-width: 1024px) {
+            .block-container { padding-left: 2rem; padding-right: 2rem; }
+        }
+
+        /* スマホ: さらに余白を詰め、タブ文字を縮小して片手操作に最適化 */
+        @media (max-width: 640px) {
+            .block-container {
+                padding-top: 2.5rem;
+                padding-left: 0.8rem;
+                padding-right: 0.8rem;
+            }
+            .stTabs [data-baseweb="tab"] { font-size: 0.8rem; padding: 0 0.5rem; }
+            /* 画像（matplotlib 図）は常にコンテナ幅にフィット */
+            div[data-testid="stImage"] img { width: 100% !important; height: auto !important; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def main():
-    st.set_page_config(page_title=APP_TITLE, page_icon="🏁", layout="wide")
+    st.set_page_config(page_title=APP_TITLE, page_icon="🏁", layout="wide",
+                       initial_sidebar_state="auto")
+    _inject_responsive_css()
     _setup_mpl()
 
     st.title("🏁 F1 Data Dashboard")

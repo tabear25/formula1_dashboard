@@ -63,6 +63,18 @@ streamlit run streamlit_app.py
 
 ここに修正・変更の内容を追記していく。新しいものを上に追加すること。
 
+- **Streamlit 版のレスポンシブデザイン対応**: PC / タブレット / スマホの各画面幅で
+  見やすくなるよう `streamlit_app.py` を調整。
+  - `_inject_responsive_css()` を追加し、`main()` 冒頭（`set_page_config` 直後）で注入。
+    CSS メディアクエリで、見出しは `clamp()` によりビューポート幅に応じて滑らかに
+    スケール、タブは折り返さず横スクロール（`overflow-x:auto`/`white-space:nowrap`）、
+    タブレット（≤1024px）／スマホ（≤640px）で本文余白を段階的に縮小、スマホでは
+    タブ文字を縮小し matplotlib 画像をコンテナ幅にフィットさせる。
+  - 図描画を `st.pyplot(fig, use_container_width=True)` に変更し、列幅に追従させる。
+  - `set_page_config` に `initial_sidebar_state="auto"`（狭幅で自動折りたたみ）。
+  - 検証: `py_compile` OK / Streamlit health=ok・トップ200 / `AppTest` 例外0・
+    タイトル描画・レスポンシブ CSS（`clamp(`＋`@media`）の注入を確認。
+
 - **Web デプロイ対応（Streamlit 化）**: Tkinter GUI は Vercel/Netlify で動かせないため、
   ブラウザ利用できる Streamlit 版を追加した。デスクトップ版は維持。
   - 新規: `streamlit_app.py`（Web エントリ）、`core/charts.py`（Figure/結果テーブル生成の
