@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PITWALL — F1 Dashboard</title>
+<link rel="stylesheet" href="styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><rect width='16' height='16' rx='3' fill='%230b0d12'/><rect x='3' y='7' width='10' height='2' fill='%23e10600'/></svg>">
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <span class="brand-name">PITWALL</span>
+    <span class="brand-sub">F1 DATA DASHBOARD</span>
+  </div>
+  <div class="picker" id="picker">
+    <select id="sel-year" aria-label="開催年"></select>
+    <select id="sel-event" aria-label="グランプリ"></select>
+    <select id="sel-session" aria-label="セッション"></select>
+    <button class="load-btn" id="btn-load">読み込み</button>
+    <div class="load-status" id="load-status"></div>
+  </div>
+  <div class="session-title" id="session-title"></div>
+</header>
+
+<div class="driver-strip" id="driver-strip" hidden></div>
+
+<div class="stat-row" id="stat-row" hidden></div>
+
+<nav class="tab-nav" id="tab-nav" hidden></nav>
+
+<main class="view-wrap" id="view-wrap">
+  <div class="boot-hero" id="boot-hero">
+    <div class="big">PITWALL</div>
+    <div>年・グランプリ・セッションを選んで「読み込み」を押してください。</div>
+    <div style="margin-top:6px">初回のセッションはデータ取得に数分かかることがあります（2回目以降はキャッシュで高速化されます）。</div>
+  </div>
+</main>
+
+<div class="footer-note">
+  データ: <a href="https://docs.fastf1.dev/" target="_blank" rel="noopener">FastF1</a>（F1公式タイミング）。
+  ラップチャートの着想: <a href="https://github.com/davidor/formula1-lap-charts" target="_blank" rel="noopener">davidor/formula1-lap-charts</a>。
+  対応期間: 2018年以降（ライブタイミングデータが存在する範囲）。
+</div>
+
+<div class="viz-tooltip" id="viz-tooltip"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
