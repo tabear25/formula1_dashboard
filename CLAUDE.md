@@ -198,6 +198,23 @@ GP＋セッション選択 → service.load_session_async(year, gp, ses)      �
 
 ここに修正・変更の内容を追記していく。新しいものを上に追加すること。
 
+- **PITWALL を PaaS（Render）にデプロイ可能化**: 「ローカルの `py server.py` と同じ
+  デザインを Web でも見たい」という要望に対応。Streamlit 版と PITWALL は別実装
+  （Streamlit=matplotlib 静止画を標準UIに配置／PITWALL=自前 SVG のインタラクティブ描画）
+  のため、同一デザインを得るには PITWALL 自体をデプロイするのが唯一の方法。
+  - `server.py`: `main()` を `$PORT` / `$HOST` 環境変数と `--host` 引数に対応させ、
+    キャッシュ先を `FASTF1_CACHE` 環境変数優先（未設定は従来 `config.CACHE_DIR`）に。
+    ブラウザ自動起動はローカルのループバック時のみに限定（PaaS では開かない）。
+    ローカルの `py server.py` の挙動は不変（既定 `127.0.0.1:8380`＋自動起動）。
+  - 新規 `render.yaml`（Render Blueprint。runtime=python / start=`python server.py
+    --host 0.0.0.0 --port $PORT --no-browser` / `FASTF1_CACHE=/tmp/f1_cache`）。
+  - 新規 `DEPLOY_PITWALL.md`（Render 手順＋Vercel/Netlify が不可な理由＋Railway/Fly 代替＋
+    無料枠の制約: スリープ／`/tmp` 揮発でキャッシュ消失／512MB メモリ）。
+  - Vercel/Netlify は常駐プロセス＋インメモリLRU＋バックグラウンドロードと相性が悪く不可。
+    常駐プロセス対応の Render/Railway/Fly を使う。
+  - 検証: `py_compile` OK ／ 引数・環境変数解決を確認 ／ `--host 0.0.0.0 --port $PORT`
+    で実起動し `/`・`styles.css`・`js/app.js` が 200、`FASTF1_CACHE` 反映をログで確認。
+
 - **Web版 PITWALL を追加**: `server.py`（stdlib http.server の JSON API、追加 pip 依存なし）+
   `web/`（vanilla JS SPA・自前SVG描画）+ `start_pitwall.cmd`。タブ＝ラップチャート
   （davidor/formula1-lap-charts のオマージュ）/ ギャップ（リーダー基準・勝者平均基準）/
