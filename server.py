@@ -14,6 +14,7 @@ import gzip
 import json
 import logging
 import math
+import os
 import threading
 import time
 import traceback
@@ -833,22 +834,31 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser(description="PITWALL - F1 web dashboard server")
-    parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    # PaaS（Render 等）は $PORT / $HOST を注入する。ローカルは従来の既定値で動く。
+    parser.add_argument("--port", type=int,
+                        default=int(os.environ.get("PORT", DEFAULT_PORT)))
+    parser.add_argument("--host", default=os.environ.get("HOST", "127.0.0.1"),
+                        help="バインドするホスト。PaaS では 0.0.0.0 を指定する。")
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO,
                         format="[%(asctime)s] %(levelname)s %(message)s")
 
-    cache_path = Path(CACHE_DIR)
+    # キャッシュ先は環境変数 FASTF1_CACHE を優先（PaaS の書き込み可能パス）。
+    # 未設定時は config.CACHE_DIR（ローカルの _fastf1_cache/）。core/data.py と揃える。
+    cache_path = Path(os.environ.get("FASTF1_CACHE") or CACHE_DIR)
     cache_path.mkdir(parents=True, exist_ok=True)
     fastf1.Cache.enable_cache(str(cache_path))
     logging.info("FastF1 cache: %s", cache_path.resolve())
 
-    server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    url = f"http://127.0.0.1:{args.port}/"
-    logging.info("PITWALL running at %s", url)
-    if not args.no_browser:
+    server = ThreadingHTTPServer((args.host, args.port), Handler)
+    # 表示 URL はループバック系ならそのまま、0.0.0.0 バインド時は 127.0.0.1 に読み替える。
+    display_host = "127.0.0.1" if args.host in ("0.0.0.0", "") else args.host
+    url = f"http://{display_host}:{args.port}/"
+    logging.info("PITWALL running at %s (bind %s:%s)", url, args.host, args.port)
+    # ブラウザ自動起動はローカルのループバック時のみ（PaaS では開かない）。
+    if not args.no_browser and args.host in ("127.0.0.1", "localhost"):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()

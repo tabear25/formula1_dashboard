@@ -1,0 +1,24 @@
+# Render Blueprint — PITWALL（Web版 F1 ダッシュボード）を常駐サーバとしてデプロイする。
+#
+# 使い方:
+#   1. このリポジトリを Render に接続し、Blueprint（render.yaml）からサービスを作成。
+#   2. デプロイ後に払い出される https://<service>.onrender.com/ を開く。
+#
+# ポイント:
+#   - PITWALL は stdlib http.server の常駐プロセス。サーバーレス（Vercel/Netlify）では
+#     動かないため Render/Railway/Fly 等の常駐プロセス対応 PaaS を使う。
+#   - Render は $PORT を注入する。server.py は $PORT / --host 0.0.0.0 に対応済み。
+#   - FASTF1_CACHE でキャッシュ先を書き込み可能パスに向ける（無料枠は永続化されないため
+#     再デプロイ／スリープ復帰でキャッシュは消える＝初回ロードが都度遅くなる点に注意）。
+services:
+  - type: web
+    name: pitwall-f1-dashboard
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python server.py --host 0.0.0.0 --port $PORT --no-browser
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: FASTF1_CACHE
+        value: /tmp/f1_cache
