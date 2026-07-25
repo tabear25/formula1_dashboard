@@ -43,11 +43,11 @@ formula1_dashboard/                 # ← プロジェクトルート（内側�
 │   ├── charts.py                   # matplotlib Figure / 結果テーブルを生成する純粋関数群。データ無しは ChartDataError
 │   └── data.py                     # Streamlit 用の FastF1 取得アダプタ（st.cache_data / st.cache_resource）
 ├── streamlit_app.py                # 【Streamlit版】Web エントリポイント（レスポンシブCSS注入込み）
-├── server.py                       # 【PITWALL】stdlib HTTPサーバ + /api/*（schedule/load/status/session/telemetry/trackmap）
+├── server.py                       # 【PITWALL】stdlib HTTPサーバ + /api/*（schedule/load/status/session/telemetry/trackmap/replay）
 ├── start_pitwall.cmd               # 【PITWALL】ダブルクリック起動用ランチャー
 ├── web/                            # 【PITWALL】フロントエンド（ビルド不要の ES modules）
 │   ├── index.html / styles.css     # シェルとデザイントークン（ダーク固定。--surface-1 は server.py の CHART_SURFACE と一致必須）
-│   └── js/                         # api / state / derive / svg / format + views/（lapchart, gaps, pace, violin, strategy, telemetry, track, results, control）
+│   └── js/                         # api / state / derive / svg / format + views/（replay, lapchart, gaps, pace, violin, degradation, strategy, pitstops, sectors, dominance, telemetry, track, quali, results, control）
 ├── main.py                         # 【Tkinter版】エントリポイント：F1DashboardApp(tk.Tk)・ttkスタイル定義・main()
 ├── ui/
 │   ├── __init__.py                 # 空
@@ -181,7 +181,7 @@ GP＋セッション選択 → service.load_session_async(year, gp, ses)      �
 - **`session.get_driver()` は pandas Series を返す**。`if driver_info:` のような bool 評価は `ValueError`。`driver_info is not None and 'Key' in driver_info` で判定する（`results_tab.py`・`sidebar.py` に対策済み）。
 - **キャッシュ**：`_fastf1_cache/` は gitignore 済み（内側）。`cleanup_cache()` が起動時に 30 日超ファイル削除・2GB 超で全削除。初回・キャッシュ無しは遅い。**`fastf1_http_cache.sqlite` は歴史的に追跡されてしまっており、アプリを動かすだけで差分が出る（コミットに含めない）。またサーバ/アプリ起動中はロックされ git の stash/checkout が失敗する。**
 - **Sprint 未対応（Tkinter版のみ）**：セッション Combobox は `FP1/FP2/FP3/Q/R` のみ。PITWALL はスケジュール由来で S/SQ も選択できる。
-- **PITWALL の要点**：(1) 予選/プラクティスは laps の `Position` が全て NaN → ラップチャート/ギャップタブは非表示、ペース/ラップ分布はドット中心の描画。(2) `TrackStatus` は `"124"` のような合成文字列 → 含有判定（4=SC, 5=赤旗, 6/7=VSC）。(3) チームカラーはダーク背景向けにサーバ側で OKLab 明度スナップ（`ensure_mark_contrast`、コントラスト3:1未満なら色相保持で明度+彩度を補正）。(4) `styles.css` の `--surface-1` と `server.py` の `CHART_SURFACE` は一致させること。(5) 2018年以降のみ対応（FIRST_YEAR）。
+- **PITWALL の要点**：(1) 予選/プラクティスは laps の `Position` が全て NaN → ラップチャート/ギャップ/ピット分析タブは非表示、ペース/ラップ分布はドット中心の描画。予選のみ「予選分析」タブが出る（`qualiOnly`）。(2) `TrackStatus` は `"124"` のような合成文字列 → 含有判定（4=SC, 5=赤旗, 6/7=VSC）。(3) チームカラーはダーク背景向けにサーバ側で OKLab 明度スナップ（`ensure_mark_contrast`、コントラスト3:1未満なら色相保持で明度+彩度を補正）。(4) `styles.css` の `--surface-1` と `server.py` の `CHART_SURFACE` は一致させること。(5) 2018年以降のみ対応（FIRST_YEAR）。(6) `pos_data` の欠損は NaN ではなく **X==0 かつ Y==0 の行**として現れる（`/api/replay` は除外済み）。リタイア車は座標送信が続くことがあるため laps の最終ライン通過+60秒で打ち切る。全ドライバーの SessionTime 軸は共通（実測: 中央値0.24秒間隔）。(7) リプレイのタワー順位は「周回数 → 現在周への到達時刻」のライン通過ベースでソートする（周回内の時間割合はピット中の車の順位を歪めるため使わない）。(8) リプレイタブの再生状態は `replay.js` のモジュール変数 `R` がタブ切替をまたいで保持する。URLハッシュ（`#y=&r=&s=&tab=&drv=`）で状態復元・自動読み込みができる。
 
 ## git-ignore 対象（コミット禁止）
 
@@ -197,6 +197,63 @@ GP＋セッション選択 → service.load_session_async(year, gp, ses)      �
 ## 変更履歴（Change Log）
 
 ここに修正・変更の内容を追記していく。新しいものを上に追加すること。
+
+- **PITWALL 大型拡張（究極のインタラクティブF1ダッシュボード化）**: タブを9→15枚に拡張し、
+  全車リプレイを核とした機能群を追加（2026-07-25）。
+  - サーバ: `/api/replay` を新設。全車の `pos_data` を共通0.5秒グリッドへ `np.interp` で
+    再サンプルし、trackmap と同じ回転補正をかけた X/Y を 0.1m 整数配列で返す
+    （`{t0, dt, n, race_start, cars:[{abbr, i0, i1, x[], y[]}]}`、gzip 済みを
+    `tel_cache["__replay__"]` にキャッシュ。決勝1レースで raw 約3MB / gzip 約1MB）。
+    欠損の (0,0) 行は除外し、リタイア車は laps の最終ライン通過+60秒で打ち切る。
+    予選バンドルの laps に `seg`（1/2/3、`split_qualifying_sessions()` 由来。失敗時は
+    キー自体を付けずクライアントが時間ギャップ推定へ劣化）を付与。
+  - 新タブ6枚（`web/js/views/`）:
+    `replay.js` — 全車位置リプレイ。タイミングタワー（ライン通過ベースの順位・ギャップ・
+    タイヤ・PIT表示。予選/プラクティスは暫定ベスト順に切替）、SC/VSC/赤旗の旗バッジと
+    シークバー帯、レースコントロールのティッカー、自動イベント検出（オーバーテイク/
+    ピット/FL更新/リタイア/降雨/旗）のマーカーとクリックでシークできるログ、再生速度
+    ×1〜×60、Space/←/→ ショートカット。
+    `degradation.js` — タイヤ使用周回数×タイムの散布とコンパウンド別最小二乗フィット
+    （劣化率 s/周）。レースは燃料補正トグル（0.06s/周の近似と明記）。
+    `pitstops.js` — ストップ一覧（推定ロス＝イン+アウト−クリーン中央値×2、SC中表示、
+    順位変動）とアンダーカット/オーバーカット検出（近接ペアのピット差し合いの
+    タイム差スイング）。レース専用。
+    `sectors.js` — ベストセクター・理論値（自己ベスト3セクター合計）・全体ベストとの
+    差の積み上げバー。
+    `dominance.js` — 最大6名の最速ラップをミニセクター（約170m、20〜40区間）で比較し
+    区間最速の色でコースを塗り分け。既存 /api/telemetry と /api/trackmap のみで実装。
+    `quali.js` — Q1→Q2→Q3 スロープチャートとトラック進化（セッション時間×タイム、
+    その時点までのベスト白線、セグメント境界は seg 優先・無ければ5分ギャップ推定）。
+    予選のみ表示（`qualiOnly` フラグを TABS に追加）。
+  - 横断UX（`app.js`）: URLハッシュのディープリンク
+    `#y=2025&r=1&s=R&tab=replay&drv=VER,NOR`（起動時に自動読み込み→タブ・選択復元、
+    操作のたびに `history.replaceState` で更新）。キーボード ←/→＝タブ切替、
+    Esc＝選択解除（リプレイタブは Space/←/→ を自前処理）。
+  - レビュー（3視点並行の敵対的レビュー＋反証検証）で確定した16件をすべて修正。主要:
+    (a) セッション切替中に古い /api/replay 応答が新セッションへ混入するレース条件
+    （キー検証を追加）、(b) 第三者のリタイア・ピット降格を実追い抜きと誤検出
+    （「前周は前・当周も走行中・現在は後ろ」の車がいる場合のみ記録）、(c) ブラウザ
+    タブ非表示→復帰でリプレイ時刻が大ジャンプ（rAFデルタを250msでクランプ）、
+    (d) シークバーのモーメントマーカーが親のポインタキャプチャに食われクリック不能、
+    (e) アンダーカット検出の計測窓汚染（窓内の追加ピット・双方向重複行を除外）、
+    (f) ドミナンスで途中欠損テレメトリが混ざるとコース後半が単色になる（全長95%の
+    カバレッジ検証＋補間の範囲外null化）、(g) デグラデーションの外れ値カットが表示
+    のみでフィット・表に効かない不整合（収集直後に一括除外）、(h) 予選トラック進化の
+    白線がプロット外へはみ出す（クランプ＋クリップ）、(i) スロープチャートのラベル
+    衝突解決が列をまたいで押し合う／域外ドライバーのラベルが孤立、(j) URLハッシュの
+    tab/drv が別セッションのバンドルに誤適用（sessionKey一致時のみ適用）、(k) タブ
+    フォールバック時にタブ列のactive強調が付かない（フォールバックを描画前へ移動）、
+    (l) ResizeObserver が自身の高さ変化に反応して冗長再描画（幅変化のみ発火）、
+    (m) スタート前タワーが最終結果順＋最終タイヤ表示になるネタバレ（グリッド順＋
+    スタートスティント表示）、(n) 停止中もタワーを250msごとに全再構築しクリックを
+    取りこぼす（クリックは委譲・再構築は再生中のみ）、(o) ドミナンスで明示選択を
+    2名未満に減らすと選択が勝手に復活する。
+  - 検証: headless Chrome + CDP で 2025 豪州GP決勝（全14タブ+リプレイ再生+中盤シーク+
+    タワー順位確認）と 2025 サウジ予選（7タブ、Q1/Q2/Q3境界表示）をスクリーンショット
+    確認。全修正適用後に再実行し、コンソールエラー/警告 0。実データ検証（pos_data の
+    構造・時間軸整合・ペイロードサイズ実測）に基づいて実装。
+  - 検証時の注意: URLハッシュだけが異なる同一URLへの再ナビゲートはページ再読み込みに
+    ならない（same-document navigation）。CDP検証では about:blank を経由すること。
 
 - **Web版 PITWALL を追加**: `server.py`（stdlib http.server の JSON API、追加 pip 依存なし）+
   `web/`（vanilla JS SPA・自前SVG描画）+ `start_pitwall.cmd`。タブ＝ラップチャート

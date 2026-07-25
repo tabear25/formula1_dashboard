@@ -505,6 +505,28 @@ def _build_weather(ses):
     return out
 
 
+def _quali_segments(ses):
+    """予選ラップの (Driver, LapNumber) -> セグメント番号 1/2/3。
+    split_qualifying_sessions() が使えない場合は空 dict（クライアントは推定に劣化）。"""
+    seg_map = {}
+    try:
+        parts = ses.laps.split_qualifying_sessions()
+    except Exception:
+        return seg_map
+    if not parts:
+        return seg_map
+    for seg_no, part in enumerate(parts, start=1):
+        if part is None or len(part) == 0:
+            continue
+        for row in part.itertuples(index=False):
+            drv = text(row.Driver)
+            lap_no = num(row.LapNumber)
+            if drv is None or lap_no is None:
+                continue
+            seg_map[(drv, int(lap_no))] = seg_no
+    return seg_map
+
+
 def build_bundle(ses, year, rnd, code):
     results = ses.results
     team_colors = _team_colors(ses, results)
@@ -515,6 +537,12 @@ def build_bundle(ses, year, rnd, code):
             total_laps = int(ses.total_laps)
     except (TypeError, ValueError):
         total_laps = None
+    laps_out = _build_laps(ses)
+    if session_type == "quali":
+        seg_map = _quali_segments(ses)
+        if seg_map:
+            for rec in laps_out:
+                rec["seg"] = seg_map.get((rec["drv"], rec["lap"]))
     return {
         "meta": {
             "year": year,
@@ -530,7 +558,7 @@ def build_bundle(ses, year, rnd, code):
             "total_laps": total_laps,
         },
         "drivers": _build_drivers(ses, team_colors),
-        "laps": _build_laps(ses),
+        "laps": laps_out,
         "track_status": _build_track_status(ses),
         "race_control": _build_race_control(ses),
         "weather": _build_weather(ses),
@@ -677,6 +705,121 @@ def trackmap_payload(entry, ses):
 
 
 # ---------------------------------------------------------------------------
+# リプレイ（全車位置の共通時間グリッド）
+# ---------------------------------------------------------------------------
+
+REPLAY_DT = 0.5          # 秒。実測でこの粒度なら決勝全体で gzip 後 1MB 台に収まる
+REPLAY_PRE_START = 150.0  # レーススタート前に含める秒数（フォーメーションラップ）
+REPLAY_POST_END = 60.0    # 最終ラップ通過後に含める秒数
+
+def replay_payload(entry, ses):
+    """全車の X,Y を共通時間グリッドへ線形補間したリプレイ用データ。
+    成功時は (raw_json_bytes, gz_bytes) を tel_cache にキャッシュして返し、
+    失敗時は {"error": ...} を返す。
+
+    実測に基づく前提（2025 豪州GP決勝 / サウジ予選で検証済み）:
+      - pos_data は全ドライバーが同一の SessionTime 軸を持つ（中央値 0.24s 間隔）
+      - 欠損は NaN ではなく X==0 かつ Y==0 の行として現れる
+      - リタイア車はその後も座標を送り続ける場合があるため laps の最終通過時刻で打ち切る
+    """
+    cached = entry["tel_cache"].get("__replay__")
+    if cached is not None:
+        return cached
+
+    try:
+        pos = ses.pos_data
+    except Exception as exc:
+        return {"error": f"position data unavailable: {exc}"}
+    if not pos:
+        return {"error": "position data unavailable"}
+
+    circuit = _circuit_info(entry, ses)
+    rotation = circuit["rotation"]
+
+    # ドライバー番号 -> 略称
+    num_to_abbr = {}
+    results = ses.results
+    if results is not None and len(results) > 0:
+        for _, row in results.iterrows():
+            n, a = text(row.get("DriverNumber")), text(row.get("Abbreviation"))
+            if n and a:
+                num_to_abbr[n] = a
+
+    # ラップ由来の基準時刻（レーススタート・各車の最終ライン通過）
+    laps = ses.laps
+    race_start = None
+    last_et = {}
+    if laps is not None and len(laps) > 0:
+        lap1 = laps[laps["LapNumber"] == 1]["LapStartTime"].dropna()
+        if len(lap1) > 0:
+            race_start = float(lap1.min().total_seconds())
+        for abbr in laps["Driver"].dropna().unique().tolist():
+            ets = laps[laps["Driver"] == abbr]["Time"].dropna()
+            if len(ets) > 0:
+                last_et[abbr] = float(ets.max().total_seconds())
+
+    # 時間範囲: 位置データの実範囲と、スタート前150s〜最終通過+60s の共通部分
+    sample_df = next(iter(pos.values()))
+    pos_t = sample_df["SessionTime"].dt.total_seconds()
+    pos_lo, pos_hi = float(pos_t.min()), float(pos_t.max())
+    t_lo = pos_lo if race_start is None else max(pos_lo, race_start - REPLAY_PRE_START)
+    t_hi = pos_hi if not last_et else min(pos_hi, max(last_et.values()) + REPLAY_POST_END)
+    if t_hi - t_lo > 4 * 3600:
+        t_hi = t_lo + 4 * 3600
+    if t_hi <= t_lo:
+        return {"error": "position data time range is empty"}
+    grid = np.arange(t_lo, t_hi + 1e-9, REPLAY_DT)
+
+    cars = []
+    for num_str, df in pos.items():
+        if df is None or len(df) == 0:
+            continue
+        abbr = num_to_abbr.get(str(num_str)) or str(num_str)
+        t_arr = df["SessionTime"].dt.total_seconds().to_numpy()
+        x_arr = df["X"].to_numpy(dtype=float)
+        y_arr = df["Y"].to_numpy(dtype=float)
+        valid = ~((x_arr == 0.0) & (y_arr == 0.0))
+        if int(valid.sum()) < 5:
+            continue
+        t_v, x_v, y_v = t_arr[valid], x_arr[valid], y_arr[valid]
+        cutoff = float(t_v[-1])
+        if abbr in last_et:
+            cutoff = min(cutoff, last_et[abbr] + REPLAY_POST_END)
+        i0 = int(np.searchsorted(grid, float(t_v[0]), "left"))
+        i1 = int(np.searchsorted(grid, cutoff, "right")) - 1
+        if i1 - i0 < 4:
+            continue
+        sub = grid[i0:i1 + 1]
+        x_i = np.interp(sub, t_v, x_v)
+        y_i = np.interp(sub, t_v, y_v)
+        x_r, y_r = _rotate_xy(x_i, y_i, rotation)
+        cars.append({
+            "abbr": abbr,
+            "i0": i0, "i1": i1,
+            "x": [int(round(v)) for v in x_r],
+            "y": [int(round(v)) for v in y_r],
+        })
+
+    if not cars:
+        return {"error": "no usable position data"}
+
+    payload = {
+        "t0": round(float(grid[0]), 3),
+        "dt": REPLAY_DT,
+        "n": int(len(grid)),
+        "race_start": round(race_start, 3) if race_start is not None else None,
+        "rotation": rotation,
+        "cars": cars,
+    }
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    result = (raw, gzip.compress(raw, 6))
+    entry["tel_cache"]["__replay__"] = result
+    logging.info("Replay payload built: %d cars, %d samples, %d KB (gz %d KB)",
+                 len(cars), len(grid), len(raw) // 1024, len(result[1]) // 1024)
+    return result
+
+
+# ---------------------------------------------------------------------------
 # HTTP ハンドラ
 # ---------------------------------------------------------------------------
 
@@ -815,6 +958,23 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_error_json("session not loaded", status=409)
                 return
             self._send_json(trackmap_payload(entry, entry["session"]))
+            return
+
+        if path == "/api/replay":
+            year, rnd, code = self._session_params(query)
+            entry = STORE.entry(year, rnd, code)
+            if entry is None or entry["state"] != "ready":
+                self._send_error_json("session not loaded", status=409)
+                return
+            result = replay_payload(entry, entry["session"])
+            if isinstance(result, dict):
+                self._send_json(result)
+                return
+            raw, gz = result
+            if "gzip" in (self.headers.get("Accept-Encoding") or ""):
+                self._send_bytes(gz, "application/json; charset=utf-8", gz=True)
+            else:
+                self._send_bytes(raw, "application/json; charset=utf-8")
             return
 
         self._send_error_json(f"unknown api path: {path}", status=404)

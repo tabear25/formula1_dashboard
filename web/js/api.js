@@ -29,4 +29,6 @@ export const api = {
             `&drivers=${drivers.join(",")}&lap=${lap}`),
   trackmap: (year, round, session) =>
     getJSON(`/api/trackmap?year=${year}&round=${round}&session=${session}`),
+  replay: (year, round, session) =>
+    getJSON(`/api/replay?year=${year}&round=${round}&session=${session}`),
 };

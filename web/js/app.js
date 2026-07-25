@@ -14,6 +14,12 @@ import { renderTelemetry } from "./views/telemetry.js";
 import { renderTrack } from "./views/track.js";
 import { renderResults } from "./views/results.js";
 import { renderControl } from "./views/control.js";
+import { renderDominance } from "./views/dominance.js";
+import { renderDegradation } from "./views/degradation.js";
+import { renderSectors } from "./views/sectors.js";
+import { renderPitstops } from "./views/pitstops.js";
+import { renderQuali } from "./views/quali.js";
+import { renderReplay } from "./views/replay.js";
 
 const $ = (id) => document.getElementById(id);
 const selYear = $("sel-year");
@@ -33,16 +39,29 @@ const SESSION_LABEL = {
 };
 
 const TABS = [
+  { id: "replay", label: "リプレイ", raceOnly: false, render: renderReplay },
   { id: "lapchart", label: "ラップチャート", raceOnly: true, render: renderLapChart },
   { id: "gaps", label: "ギャップ", raceOnly: true, render: renderGaps },
   { id: "pace", label: "ペース", raceOnly: false, render: renderPace },
   { id: "violin", label: "ラップ分布", raceOnly: false, render: renderViolin },
+  { id: "degradation", label: "デグラデーション", raceOnly: false, render: renderDegradation },
   { id: "strategy", label: "タイヤ戦略", raceOnly: false, render: renderStrategy },
+  { id: "pitstops", label: "ピット分析", raceOnly: true, render: renderPitstops },
+  { id: "sectors", label: "セクター", raceOnly: false, render: renderSectors },
+  { id: "dominance", label: "ドミナンス", raceOnly: false, render: renderDominance },
   { id: "telemetry", label: "テレメトリ", raceOnly: false, render: renderTelemetry },
   { id: "track", label: "トラック", raceOnly: false, render: renderTrack },
+  { id: "quali", label: "予選分析", qualiOnly: true, render: renderQuali },
   { id: "results", label: "リザルト", raceOnly: false, render: renderResults },
   { id: "control", label: "レースコントロール", raceOnly: false, render: renderControl },
 ];
+
+// タブがこのセッション種別で表示可能か
+function tabVisible(tab, type) {
+  if (tab.raceOnly && type !== "race") return false;
+  if (tab.qualiOnly && type !== "quali") return false;
+  return true;
+}
 
 let schedule = null;
 let pollToken = 0;
@@ -60,7 +79,20 @@ async function boot() {
     }
     const savedYear = localStorage.getItem("pitwall.year");
     if (savedYear && years.includes(Number(savedYear))) selYear.value = savedYear;
+    if (pendingHash && years.includes(pendingHash.year)) selYear.value = String(pendingHash.year);
     await loadSchedule();
+    // ハッシュ指定があればセッションまで選択して自動読み込み
+    if (pendingHash && schedule) {
+      const ev = schedule.events.find((e) => e.round === pendingHash.round);
+      if (ev) {
+        selEvent.value = String(ev.round);
+        fillSessions();
+        if (ev.sessions.some((s) => s.code === pendingHash.session)) {
+          selSession.value = pendingHash.session;
+          startLoad();
+        }
+      }
+    }
   } catch (err) {
     setStatus(`サーバに接続できません: ${err.message}`, "error");
   }
@@ -214,26 +246,97 @@ function onBundle(sessionKey, bundle) {
 
 on("bundle", () => {
   $("boot-hero")?.remove();
+  const type = state.bundle.meta.type;
+  // URLハッシュからの復元: ハッシュが指すセッションのバンドルにのみ適用する。
+  // どのバンドルが到着してもハッシュの意図はそこで消費済みとしてクリアする。
+  const hashMatches = pendingHash && state.sessionKey
+    && state.sessionKey.year === pendingHash.year
+    && state.sessionKey.round === pendingHash.round
+    && state.sessionKey.code === pendingHash.session;
+  if (hashMatches) {
+    if (pendingHash.tab && TABS.some((t) => t.id === pendingHash.tab && tabVisible(t, type))) {
+      state.tab = pendingHash.tab;
+    }
+    if (pendingHash.drv) {
+      for (const abbr of pendingHash.drv) {
+        if (state.bundle.drivers.some((d) => d.abbr === abbr)) state.focus.add(abbr);
+      }
+    }
+  }
+  pendingHash = null;
+  const currentTab = TABS.find((t) => t.id === state.tab);
+  if (!currentTab || !tabVisible(currentTab, type)) {
+    state.tab = type === "race" ? "lapchart" : "pace";
+  }
   renderSessionTitle();
   renderStrip();
   renderStats();
   renderTabs();
-  const isRace = state.bundle.meta.type === "race";
-  const currentTab = TABS.find((t) => t.id === state.tab);
-  if (!currentTab || (currentTab.raceOnly && !isRace)) {
-    state.tab = isRace ? "lapchart" : "pace";
-  }
   renderActiveView();
+  syncHash();
 });
 
 on("focus", () => {
   updateStripSelection();
   renderActiveView();
+  syncHash();
 });
 
 on("tab", () => {
   renderTabs();
   renderActiveView();
+  syncHash();
+});
+
+// ------------------------------------------------- URL ディープリンク
+
+// #y=2025&r=1&s=R&tab=replay&drv=VER,NOR 形式。読み込みボタン無しで共有可能にする。
+function parseHash() {
+  const raw = location.hash.replace(/^#/, "");
+  if (!raw) return null;
+  const params = new URLSearchParams(raw);
+  const year = Number(params.get("y"));
+  const round = Number(params.get("r"));
+  const session = params.get("s");
+  if (!year || !round || !session) return null;
+  return {
+    year, round, session,
+    tab: params.get("tab") || null,
+    drv: params.get("drv") ? params.get("drv").split(",").filter(Boolean) : null,
+  };
+}
+
+let pendingHash = parseHash();
+
+function syncHash() {
+  if (!state.sessionKey) return;
+  const params = new URLSearchParams();
+  params.set("y", String(state.sessionKey.year));
+  params.set("r", String(state.sessionKey.round));
+  params.set("s", state.sessionKey.code);
+  params.set("tab", state.tab);
+  if (state.focus.size > 0) params.set("drv", [...state.focus].join(","));
+  history.replaceState(null, "", `#${params.toString()}`);
+}
+
+// ------------------------------------------------- キーボードショートカット
+
+// ←/→ = タブ切替、Esc = ドライバー選択解除。リプレイタブは ←/→/Space を自前処理。
+document.addEventListener("keydown", (evt) => {
+  const tag = evt.target?.tagName;
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  if (!state.bundle) return;
+  if (state.tab === "replay" && (evt.key === " " || evt.key === "ArrowLeft" || evt.key === "ArrowRight")) return;
+  if (evt.key === "ArrowRight" || evt.key === "ArrowLeft") {
+    const visible = TABS.filter((t) => tabVisible(t, state.bundle.meta.type));
+    const idx = visible.findIndex((t) => t.id === state.tab);
+    if (idx < 0) return;
+    const next = visible[(idx + (evt.key === "ArrowRight" ? 1 : visible.length - 1)) % visible.length];
+    setTab(next.id);
+    evt.preventDefault();
+  } else if (evt.key === "Escape") {
+    clearFocus();
+  }
 });
 
 function renderSessionTitle() {
@@ -450,9 +553,9 @@ function addCircuitTile() {
 function renderTabs() {
   tabNav.hidden = false;
   tabNav.innerHTML = "";
-  const isRace = state.bundle?.meta.type === "race";
+  const type = state.bundle?.meta.type;
   for (const tab of TABS) {
-    if (tab.raceOnly && !isRace) continue;
+    if (!tabVisible(tab, type)) continue;
     const btn = document.createElement("button");
     btn.className = `tab-btn${state.tab === tab.id ? " active" : ""}`;
     btn.textContent = tab.label;
@@ -476,9 +579,14 @@ function renderActiveView() {
   }
 }
 
-// リサイズで再描画（デバウンス）
+// リサイズで再描画（デバウンス）。ビュー自身の高さ変化（描画で必ず起きる）には
+// 反応せず、横幅が変わったときだけ再レンダリングする。
 let resizeTimer = null;
-new ResizeObserver(() => {
+let lastViewWidth = null;
+new ResizeObserver((entries) => {
+  const w = entries[entries.length - 1].contentRect.width;
+  if (w === lastViewWidth) return;
+  lastViewWidth = w;
   if (!state.bundle) return;
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(renderActiveView, 180);
